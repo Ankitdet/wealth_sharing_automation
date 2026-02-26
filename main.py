@@ -153,49 +153,57 @@ class BGolAPIClient:
         endpoint: str,
         payload: Optional[Dict[str, Any]] = None,
         additional_headers: Optional[Dict[str, str]] = None,
+        max_retries: int = 5,
     ) -> Dict[str, Any]:
-        """
-        Make an HTTP request to the API
-
-        Args:
-            method: HTTP method (GET, POST, etc.)
-            endpoint: API endpoint path
-            payload: Request payload as dictionary
-            additional_headers: Additional headers to merge with common headers
-
-        Returns:
-            Parsed JSON response as dictionary
-
-        Raises:
-            Exception: If the request fails or response is invalid
-        """
-        conn = http.client.HTTPSConnection(self.config.base_url)
-
-        try:
+        body = json.dumps(payload) if payload else None
+        for attempt in range(max_retries):
+            # 🔁 Rotate headers every attempt
             headers = self._get_common_headers()
             if additional_headers:
                 headers.update(additional_headers)
+            conn = http.client.HTTPSConnection(self.config.base_url, timeout=20)
+            try:
+                conn.request(method, endpoint, body, headers)
+                response = conn.getresponse()
+                raw_data = response.read()
+                text_data = raw_data.decode("utf-8", errors="ignore")
 
-            body = json.dumps(payload) if payload else None
+                # ✅ Success
+                if response.status in (200, 201):
+                    try:
+                        return json.loads(text_data)
+                    except json.JSONDecodeError:
+                        raise Exception(f"Invalid JSON response: {text_data}")
 
-            conn.request(method, endpoint, body, headers)
-            response = conn.getresponse()
-            data = response.read()
+                # 🚦 Rate limited
+                if response.status == 429:
+                    wait = (2 ** attempt) + random.uniform(0.5, 1.5)
+                    print(f"⚠️ 429 Too Many Requests. Rotating UA. Sleeping {wait:.1f}s...")
+                    time.sleep(wait)
+                    continue
 
-            # Check response status
-            if response.status not in (200, 201):
+                # 🛑 Likely fingerprint / auth block
+                if response.status in (401, 403):
+                    wait = random.uniform(2.0, 4.0)
+                    print(f"⚠️ {response.status} Blocked. Rotating UA. Sleeping {wait:.1f}s...")
+                    time.sleep(wait)
+                    continue
+
+                # ❌ Other errors (don’t retry)
                 raise Exception(
-                    f"API request failed with status {response.status}: {data.decode('utf-8')}"
+                    f"API request failed with status {response.status}: {text_data}"
                 )
 
-            return json.loads(data.decode("utf-8"))
+            except (http.client.HTTPException, TimeoutError) as e:
+                wait = (2 ** attempt) + random.uniform(1.0, 2.0)
+                print(f"⚠️ Network error: {e}. Retrying in {wait:.1f}s...")
+                time.sleep(wait)
+                continue
 
-        except json.JSONDecodeError as e:
-            raise Exception(f"Failed to parse JSON response: {e}")
-        except Exception as e:
-            raise Exception(f"Request failed: {e}")
-        finally:
-            conn.close()
+            finally:
+                conn.close()
+
+        raise Exception("Max retries exceeded (rotating UA each attempt)")
 
     def login(self, email: str, password: str = "", is_validator: bool = True) -> str:
         """
@@ -417,8 +425,7 @@ def process_multiple_accounts(
                 print(f"  ├─ Following share ID: {share_id}")
                 follow_response = client.follow_share(share_id)
                 print(f"  └─ Follow response: {follow_response}")
-            
-            if referral_code:
+            else:
                 print(f"  ├─ No share ID provided, skipping follow step.")
                 # Apply referral code
                 print(f"  ├─ Applying referral code: {referral_code}")
@@ -441,9 +448,10 @@ def process_multiple_accounts(
             print(f"  └─ Error: {e}")
 
         results.append(result)
-        print(f"sleeping for second.")  # Empty line for readability
         # ⏳ Delay 1 second before next account
-        time.sleep(1)
+        sleep_time = random.uniform(6, 12)
+        print(f"Sleeping {sleep_time:.1f}s...")
+        time.sleep(sleep_time)
     return results
 
 
