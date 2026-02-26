@@ -205,6 +205,28 @@ class BGolAPIClient:
 
         raise Exception("Max retries exceeded (rotating UA each attempt)")
 
+    def get_show_all_followed(self) -> Optional[str]:
+        if not self.token:
+            raise Exception("Not authenticated. Please login first.")
+        payload = {
+            "pageNum": 0,
+            "pageSize": 5,
+            "isFinish": False
+        }
+
+        additional_headers = {"app-login-token": self.token}
+
+        response = self._make_request(
+            "POST",
+            "/api/app/second/share/user/list",
+            payload,
+            additional_headers,
+        )
+        show_all = response.get("data", {}).get("showAllFollowed", [])
+        if show_all:
+            return show_all[0]
+        return None
+
     def login(self, email: str, password: str = "", is_validator: bool = True) -> str:
         """
         Authenticate user and retrieve access token
@@ -373,7 +395,7 @@ def read_credentials_from_csv(csv_path: str) -> List[AccountCredentials]:
 
 
 def process_multiple_accounts(
-    csv_path: str, referral_code: str, share_id: str, config: Optional[APIConfig] = None
+    csv_path: str, referral_code: str, is_show_all_followed: str, config: Optional[APIConfig] = None
 ) -> List[Dict[str, Any]]:
     """
     Process multiple accounts from CSV file
@@ -421,10 +443,14 @@ def process_multiple_accounts(
             result["token"] = token
             print(f"  ├─ Login successful! Token: {token[:20]}...")
 
-            if share_id:
+            if is_show_all_followed:
+                share_id = client.get_show_all_followed()
                 print(f"  ├─ Following share ID: {share_id}")
-                follow_response = client.follow_share(share_id)
-                print(f"  └─ Follow response: {follow_response}")
+                if share_id:
+                    follow_response = client.follow_share(share_id)
+                    print(f"  └─ Follow response: {follow_response}")
+                else:
+                    print(f"  └─ No share ID found to follow.")
             else:
                 print(f"  ├─ No share ID provided, skipping follow step.")
                 # Apply referral code
@@ -511,11 +537,11 @@ def main():
         
         # Process all accounts from CSV
         referral_code = os.getenv("REFERRAL_CODE")
-        share_id = os.getenv("SHARE_ID")
+        is_show_all_followed = os.getenv("IS_SHOW_ALL_FOLLOWED", "false").lower() == "true"
         if not referral_code:
             print("Error: REFERRAL_CODE not set in .env")
             return 1
-        results = process_multiple_accounts(csv_path, referral_code=referral_code, share_id=share_id)
+        results = process_multiple_accounts(csv_path, referral_code=referral_code, is_show_all_followed=is_show_all_followed)
         timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         output_file = f"results_{timestamp}.json"
 
