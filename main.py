@@ -9,29 +9,53 @@ import random
 import time
 import os
 from dotenv import load_dotenv
+from itertools import cycle
 
 load_dotenv()
+
+DOMAINS = cycle([
+    "https://dsj77.net",
+    "https://dsj44.com",
+    "https://dsj35.com",
+])
 
 def generate_browser_profiles(n=50):
     desktop_platforms = [
         ("Windows", "Windows NT 10.0; Win64; x64"),
         ("Windows", "Windows NT 11.0; Win64; x64"),
-        ("Windows", "Windows NT 6.1; Win64; x64"),  # Win7
+        ("Windows", "Windows NT 6.1; Win64; x64"),
+        ("Windows", "Windows NT 6.3; Win64; x64"),
+        ("Windows", "Windows NT 10.0; WOW64"),
+        ("macOS", "Macintosh; Intel Mac OS X 11_7"),
         ("macOS", "Macintosh; Intel Mac OS X 12_6"),
         ("macOS", "Macintosh; Intel Mac OS X 13_5"),
         ("macOS", "Macintosh; Intel Mac OS X 14_0"),
+        ("macOS", "Macintosh; Apple Silicon Mac OS X 14_1"),
         ("Linux", "X11; Linux x86_64"),
         ("Linux", "X11; Ubuntu; Linux x86_64"),
+        ("Linux", "X11; Fedora; Linux x86_64"),
+        ("Linux", "X11; Debian; Linux x86_64"),
+        ("Linux", "X11; Arch Linux; Linux x86_64"),
+        ("Linux", "X11; Linux armv8l"),
     ]
 
     mobile_platforms = [
+        ("iPhone", "iPhone; CPU iPhone OS 15_7 like Mac OS X"),
         ("iPhone", "iPhone; CPU iPhone OS 16_5 like Mac OS X"),
         ("iPhone", "iPhone; CPU iPhone OS 17_0 like Mac OS X"),
+        ("iPhone", "iPhone; CPU iPhone OS 17_3 like Mac OS X"),
+        ("iPad", "iPad; CPU OS 15_8 like Mac OS X"),
         ("iPad", "iPad; CPU OS 16_6 like Mac OS X"),
+        ("iPad", "iPad; CPU OS 17_0 like Mac OS X"),
+        ("Android", "Linux; Android 10; SM-A515F"),
         ("Android", "Linux; Android 11; SM-G991B"),
         ("Android", "Linux; Android 12; Pixel 7"),
         ("Android", "Linux; Android 13; Redmi Note 12"),
         ("Android", "Linux; Android 14; Samsung Galaxy S23"),
+        ("Android", "Linux; Android 14; Pixel 8"),
+        ("Android", "Linux; Android 13; OnePlus 11"),
+        ("Android", "Linux; Android 12; Mi 11X"),
+        ("Android", "Linux; Android 11; Nokia G21"),
     ]
 
     platforms = desktop_platforms + mobile_platforms
@@ -123,6 +147,7 @@ class BGolAPIClient:
 
     def _get_common_headers(self) -> Dict[str, str]:
         browser = self.header_rotator.next()
+        base = next(DOMAINS)
         return {
             "accept": "application/json, text/plain, */*",
             "accept-language": "en-GB,en-US;q=0.9,en;q=0.8",
@@ -131,10 +156,10 @@ class BGolAPIClient:
             "app-version": self.config.app_version,
             "aws-check": "true",
             "content-type": "application/json;charset=UTF-8",
-            "origin": self.config.origin,
+            "origin": base,
             "priority": "u=1, i",
-            "referer": self.config.referer,
-            "request-domain": self.config.request_domain,
+            "referer": f"{base}/",
+            "request-domain":  f"{base}/pc/#/",
             "sec-fetch-dest": "empty",
             "sec-fetch-mode": "cors",
             "sec-fetch-site": "cross-site",
