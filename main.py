@@ -10,14 +10,23 @@ import time
 import os
 from dotenv import load_dotenv
 from itertools import cycle
+import ast
 
 load_dotenv()
 
-DOMAINS = cycle([
-    "https://dsj77.net",
-    "https://dsj44.com",
-    "https://dsj35.com",
-])
+def load_env_list(key: str) -> list:
+    raw = os.getenv(key, "[]")
+    try:
+        data = ast.literal_eval(raw)
+        if not isinstance(data, list) or not data:
+            raise ValueError
+        return data
+    except Exception:
+        raise ValueError(f"{key} must be a non-empty list in .env")
+
+DOMAINS = cycle(load_env_list("DOMAIN"))
+APP_VERSIONS = cycle(load_env_list("APP_VERSIONS"))
+TIMEZONES = cycle(load_env_list("TIMEZONES"))
 
 def generate_browser_profiles(n=50):
     desktop_platforms = [
@@ -146,14 +155,17 @@ class BGolAPIClient:
         self.header_rotator = HeaderRotator(50)
 
     def _get_common_headers(self) -> Dict[str, str]:
-        browser = self.header_rotator.next()
+        tz = next(TIMEZONES)
+        app_ver = next(APP_VERSIONS)
         base = next(DOMAINS)
+        browser = self.header_rotator.next()
+
         return {
             "accept": "application/json, text/plain, */*",
             "accept-language": "en-GB,en-US;q=0.9,en;q=0.8",
             "app-analog": "false",
-            "app-client-timezone": self.config.timezone,
-            "app-version": self.config.app_version,
+            "app-client-timezone": tz,
+            "app-version": app_ver,
             "aws-check": "true",
             "content-type": "application/json;charset=UTF-8",
             "origin": base,
