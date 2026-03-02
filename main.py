@@ -11,6 +11,7 @@ import os
 from dotenv import load_dotenv
 from itertools import cycle
 import ast
+import sys
 
 load_dotenv()
 
@@ -470,11 +471,12 @@ def process_multiple_accounts(
             client = BGolAPIClient(config)
 
             # Login
+            is_validator = getattr(creds, "is_validator", True)
             print(f"  ├─ Logging in...")
             token = client.login(
                 email=creds.email,
                 password=creds.password,
-                is_validator=creds.is_validator,
+                is_validator=is_validator,
             )
             result["login_success"] = True
             result["token"] = token
@@ -558,8 +560,12 @@ def print_summary(results: List[Dict[str, Any]]):
 
 def main():
     """Main execution function"""
-    # Get CSV path and referral code from command line args or environment
-    csv_path = os.getenv("CSV_PATH", "credentials.csv")
+
+    # Get CSV path from CLI first, fallback to env, then default
+    if len(sys.argv) > 1:
+        csv_path = sys.argv[1]
+    else:
+        csv_path = os.getenv("CSV_PATH", "credentials.csv")
 
     # Check if CSV file exists
     if not Path(csv_path).exists():
